@@ -1,0 +1,72 @@
+---
+alwaysApply: true
+---
+# Drizzle Database Rules
+
+## Database Schema and Operations
+
+**ALL DATABASE INTERACTIONS MUST USE DRIZZLE ORM**
+
+### Schema Location
+- Primary schema is defined in [src/db/schema.ts](mdc:src/db/schema.ts)
+- Contains `decksTable` and `cardsTable` definitions with proper relationships
+- Uses PostgreSQL with integer primary keys and Clerk user IDs
+
+### Required Imports
+```typescript
+import { db } from '@/db'; // Database connection
+import { decksTable, cardsTable } from '@/db/schema'; // Table definitions
+import { eq, and, desc } from 'drizzle-orm'; // Query operators
+```
+
+### Database Operations Rules
+
+1. **Always use Drizzle queries** - NO raw SQL queries
+2. **Import tables from schema** - Use `decksTable` and `cardsTable` from schema
+3. **Use typed queries** - Leverage Drizzle's type safety
+4. **Handle user context** - All queries must filter by `userId` from Clerk
+5. **Use proper error handling** - Wrap database operations in try-catch blocks
+
+### Common Patterns
+
+**SELECT Operations:**
+```typescript
+// Get user's decks
+const userDecks = await db.select().from(decksTable).where(eq(decksTable.userId, userId));
+
+// Get deck with cards
+const deckWithCards = await db.select().from(decksTable)
+  .leftJoin(cardsTable, eq(decksTable.id, cardsTable.deckId))
+  .where(eq(decksTable.id, deckId));
+```
+
+**INSERT Operations:**
+```typescript
+// Create new deck
+const [newDeck] = await db.insert(decksTable).values({
+  userId,
+  title,
+  description
+}).returning();
+```
+
+**UPDATE Operations:**
+```typescript
+// Update deck
+await db.update(decksTable)
+  .set({ title: newTitle, updatedAt: new Date() })
+  .where(and(eq(decksTable.id, deckId), eq(decksTable.userId, userId)));
+```
+
+**DELETE Operations:**
+```typescript
+// Delete deck (cascades to cards)
+await db.delete(decksTable)
+  .where(and(eq(decksTable.id, deckId), eq(decksTable.userId, userId)));
+```
+
+### Security Requirements
+- **ALWAYS** filter by `userId` for user-owned resources
+- **NEVER** allow direct access to other users' data
+- Use `and()` operator to combine user and resource filters
+- Validate user ownership before UPDATE/DELETE operations

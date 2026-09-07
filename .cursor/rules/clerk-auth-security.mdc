@@ -1,0 +1,134 @@
+---
+alwaysApply: true
+---
+# Clerk Authentication & Data Security Rules
+
+This project uses **Clerk** for authentication and authorization. It is **CRITICAL** that users can only access their own data and never access data belonging to other users.
+
+## Core Security Principles
+
+### 1. User Data Isolation
+- **ALWAYS** filter database queries by the authenticated user's ID (`userId`)
+- **NEVER** allow direct access to data without user ownership validation
+- **ALL** database operations must include user context validation
+
+### 2. Authentication Requirements
+- Use Clerk's `auth()` helper to get the current user context
+- Validate user authentication before any data operations
+- Handle unauthenticated users appropriately (redirect to sign-in)
+
+## Database Query Security Patterns
+
+### Required Pattern for ALL queries:
+```typescript
+import { auth } from '@clerk/nextjs';
+import { db } from '@/db';
+import { decksTable, cardsTable } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+
+// Get current user
+const { userId } = auth();
+if (!userId) {
+  // Handle unauthenticated user
+  redirect('/sign-in');
+}
+
+// ALWAYS filter by userId for user-owned resources
+const userDecks = await db.select()
+  .from(decksTable)
+  .where(eq(decksTable.userId, userId));
+```
+
+### Multi-table Queries:
+```typescript
+// When joining tables, ensure BOTH tables filter by userId
+const deckWithCards = await db.select()
+  .from(decksTable)
+  .leftJoin(cardsTable, eq(decksTable.id, cardsTable.deckId))
+  .where(and(
+    eq(decksTable.userId, userId),
+    eq(decksTable.id, deckId)
+  ));
+```
+
+### Update/Delete Operations:
+```typescript
+// ALWAYS use AND condition with userId for updates/deletes
+await db.update(decksTable)
+  .set({ title: newTitle })
+  .where(and(
+    eq(decksTable.id, deckId),
+    eq(decksTable.userId, userId) // CRITICAL: Prevent unauthorized modifications
+  ));
+```
+
+## API Route Security
+
+### Server Actions & API Routes:
+- **ALWAYS** call `auth()` at the beginning of server actions
+- **NEVER** trust client-side data for user identification
+- Validate user ownership before performing any operations
+
+```typescript
+export async function updateDeck(deckId: string, data: any) {
+  const { userId } = auth();
+  if (!userId) throw new Error('Unauthorized');
+  
+  // Verify user owns the deck before updating
+  const deck = await db.select().from(decksTable)
+    .where(and(eq(decksTable.id, deckId), eq(decksTable.userId, userId)));
+  
+  if (!deck.length) throw new Error('Deck not found or access denied');
+  
+  // Proceed with update...
+}
+```
+
+## Security Violations to AVOID
+
+❌ **NEVER do this:**
+```typescript
+// Missing userId filter - SECURITY VULNERABILITY
+const allDecks = await db.select().from(decksTable);
+
+// Using client-provided userId - SECURITY VULNERABILITY  
+const userDecks = await db.select().from(decksTable)
+  .where(eq(decksTable.userId, clientProvidedUserId));
+
+// Direct access without ownership check - SECURITY VULNERABILITY
+await db.delete(decksTable).where(eq(decksTable.id, deckId));
+```
+
+✅ **Always do this:**
+```typescript
+// Secure: Filter by authenticated user
+const { userId } = auth();
+const userDecks = await db.select().from(decksTable)
+  .where(eq(decksTable.userId, userId));
+
+// Secure: Validate ownership before operations
+await db.delete(decksTable)
+  .where(and(eq(decksTable.id, deckId), eq(decksTable.userId, userId)));
+```
+
+## Error Handling
+
+- Return generic error messages to prevent information disclosure
+- Log security violations for monitoring
+- Never expose whether a resource exists if user doesn't own it
+
+```typescript
+// Good: Generic error message
+if (!userOwnedResource) {
+  throw new Error('Resource not found'); // Don't reveal if it exists for other users
+}
+```
+
+## Testing Security
+
+- Test with multiple user accounts
+- Verify users cannot access each other's data
+- Test unauthorized access attempts return appropriate errors
+- Ensure all database queries include proper user filtering
+
+**Remember: When in doubt, err on the side of caution. It's better to be overly restrictive than to accidentally expose user data.**

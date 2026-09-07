@@ -1,0 +1,198 @@
+---
+alwaysApply: true
+---
+# Data Handling & Validation Patterns
+
+This project follows strict patterns for data handling, database operations, and validation to ensure security, type safety, and maintainable architecture.
+
+## Data Retrieval Rules
+
+**ALL data retrieval MUST be done via Server Components**
+
+- Use Server Components for fetching data from the database
+- Import and use Drizzle queries directly in Server Components
+- NEVER fetch data in Client Components - pass data down as props
+- Follow the security patterns from [clerk-auth-security.mdc](mdc:.cursor/rules/clerk-auth-security.mdc)
+- Follow database patterns from [drizzle-database.mdc](mdc:.cursor/rules/drizzle-database.mdc)
+
+```typescript
+// ✅ CORRECT: Server Component data fetching
+export default async function DecksPage() {
+  const { userId } = auth();
+  if (!userId) redirect('/sign-in');
+  
+  const decks = await db.select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
+    
+  return <DecksList decks={decks} />;
+}
+```
+
+```typescript
+// ❌ INCORRECT: Client Component data fetching
+'use client';
+export default function DecksPage() {
+  const [decks, setDecks] = useState([]);
+  
+  useEffect(() => {
+    fetch('/api/decks').then(/* ... */); // Wrong approach
+  }, []);
+}
+```
+
+## Database Operations Rules
+
+**ALL database mutations (INSERT/UPDATE/DELETE) MUST use Server Actions**
+
+- Create server actions for all database write operations
+- NEVER use API routes for database mutations
+- Always validate user authentication and ownership in server actions
+- Follow security patterns to prevent unauthorized access
+
+```typescript
+// ✅ CORRECT: Server Action for database mutation
+'use server';
+
+export async function createDeck(data: CreateDeckInput) {
+  const { userId } = auth();
+  if (!userId) throw new Error('Unauthorized');
+  
+  // Validate input with Zod (see validation rules below)
+  const validatedData = createDeckSchema.parse(data);
+  
+  const [newDeck] = await db.insert(decksTable)
+    .values({
+      ...validatedData,
+      userId,
+    })
+    .returning();
+    
+  return newDeck;
+}
+```
+
+```typescript
+// ❌ INCORRECT: API route for database mutation
+// DO NOT create API routes like /api/decks for mutations
+export async function POST(request: Request) {
+  // This pattern is forbidden
+}
+```
+
+## Data Validation Rules
+
+**ALL data validation MUST use Zod schemas**
+
+- Define Zod schemas for all data inputs and outputs
+- NEVER skip validation on server actions or API endpoints
+- Create TypeScript types from Zod schemas using `z.infer<>`
+- Validate data at the boundary (server actions, API routes)
+
+```typescript
+// ✅ CORRECT: Zod schema definition and usage
+import { z } from 'zod';
+
+export const createDeckSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(100),
+  description: z.string().optional(),
+});
+
+export type CreateDeckInput = z.infer<typeof createDeckSchema>;
+
+export async function createDeck(data: CreateDeckInput) {
+  const { userId } = auth();
+  if (!userId) throw new Error('Unauthorized');
+  
+  // Always validate with Zod
+  const validatedData = createDeckSchema.parse(data);
+  
+  // Proceed with validated data...
+}
+```
+
+## Server Action Type Safety Rules
+
+**Server Actions MUST use properly typed parameters - NEVER FormData**
+
+- Define explicit TypeScript interfaces/types for server action parameters
+- Use Zod schemas to validate and ensure type safety
+- Pass structured data objects, not FormData
+- Generate TypeScript types from Zod schemas
+
+```typescript
+// ✅ CORRECT: Typed server action parameters
+export async function updateDeck(
+  deckId: string, 
+  data: UpdateDeckInput  // Properly typed parameter
+) {
+  const validatedData = updateDeckSchema.parse(data);
+  // ...
+}
+
+// ✅ CORRECT: Client-side usage with proper types
+const handleSubmit = async (formData: CreateDeckInput) => {
+  await createDeck(formData);  // Type-safe call
+};
+```
+
+```typescript
+// ❌ INCORRECT: Using FormData as parameter type
+export async function updateDeck(
+  deckId: string,
+  formData: FormData  // DO NOT use FormData as type
+) {
+  // This approach loses type safety
+}
+```
+
+## Integration Patterns
+
+**Combine these patterns for complete data flow:**
+
+1. **Server Component** → fetches data → passes to Client Component as props
+2. **Client Component** → collects user input → calls Server Action with typed data
+3. **Server Action** → validates with Zod → performs database mutation → revalidates
+
+```typescript
+// Server Component
+export default async function DeckPage({ params }: { params: { id: string } }) {
+  const deck = await getDeckById(params.id);  // Server-side data fetch
+  
+  return <DeckEditor deck={deck} />;  // Pass data as props
+}
+
+// Client Component
+'use client';
+export function DeckEditor({ deck }: { deck: Deck }) {
+  const handleSave = async (data: UpdateDeckInput) => {
+    await updateDeck(deck.id, data);  // Type-safe server action call
+    router.refresh();  // Refresh server component data
+  };
+  
+  return <form onSubmit={handleSave}>{/* ... */}</form>;
+}
+```
+
+## Error Handling
+
+- Always handle Zod validation errors appropriately
+- Return user-friendly error messages from server actions
+- Use proper error boundaries for unexpected errors
+- Log validation failures for debugging
+
+```typescript
+export async function createDeck(data: CreateDeckInput) {
+  try {
+    const validatedData = createDeckSchema.parse(data);
+    // ... database operation
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new Error(`Validation failed: ${error.errors.map(e => e.message).join(', ')}`);
+    }
+    throw error;
+  }
+}
+```
+
+These patterns ensure type safety, security, and maintainable architecture across the entire application.
