@@ -23,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <ClerkProvider appearance={{ theme: dark }}>
-          <header className="bg-gray-900 text-white px-6 py-4 flex items-center justify-between">
+          <header className="bg-slate-1200 border-b border-slate-800 text-white px-6 py-4 flex items-center justify-between">
             <h1 className="text-xl font-semibold">FlashyCardy</h1>
             <UserButton 
               appearance={{
