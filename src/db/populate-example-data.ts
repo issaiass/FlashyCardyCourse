@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { config } from 'dotenv';
-import { db } from './index';
-import { decksTable, cardsTable } from './schema';
+import { createDeck, createCardsForDeck } from './queries';
 
 // Load environment variables
 config({ path: '.env.local' });
@@ -14,11 +13,11 @@ async function populateExampleData() {
 
     // Create the Spanish Learning Deck
     console.log('Creating Spanish Learning deck...');
-    const [spanishDeck] = await db.insert(decksTable).values({
+    const spanishDeck = await createDeck({
       userId: USER_ID,
       title: 'Learn Spanish - Basic Vocabulary',
       description: 'Essential Spanish words and phrases for beginners learning from English'
-    }).returning();
+    });
 
     // Spanish vocabulary cards
     const spanishCards = [
@@ -41,22 +40,21 @@ async function populateExampleData() {
 
     // Insert Spanish cards
     console.log('Adding Spanish vocabulary cards...');
-    for (let i = 0; i < spanishCards.length; i++) {
-      await db.insert(cardsTable).values({
-        deckId: spanishDeck.id,
-        front: spanishCards[i].front,
-        back: spanishCards[i].back,
-        position: i + 1
-      });
-    }
+    const spanishCardsWithPosition = spanishCards.map((card, index) => ({
+      front: card.front,
+      back: card.back,
+      position: index + 1
+    }));
+    
+    await createCardsForDeck(spanishDeck.id, spanishCardsWithPosition);
 
     // Create the British History Deck
     console.log('Creating British History deck...');
-    const [historyDeck] = await db.insert(decksTable).values({
+    const historyDeck = await createDeck({
       userId: USER_ID,
       title: 'British History - Key Facts',
       description: 'Important events, dates, and figures in British history'
-    }).returning();
+    });
 
     // British history Q&A cards
     const historyCards = [
@@ -124,14 +122,13 @@ async function populateExampleData() {
 
     // Insert history cards
     console.log('Adding British History cards...');
-    for (let i = 0; i < historyCards.length; i++) {
-      await db.insert(cardsTable).values({
-        deckId: historyDeck.id,
-        front: historyCards[i].front,
-        back: historyCards[i].back,
-        position: i + 1
-      });
-    }
+    const historyCardsWithPosition = historyCards.map((card, index) => ({
+      front: card.front,
+      back: card.back,
+      position: index + 1
+    }));
+    
+    await createCardsForDeck(historyDeck.id, historyCardsWithPosition);
 
     console.log('✅ Successfully populated example data!');
     console.log(`📚 Created deck: "${spanishDeck.title}" with ${spanishCards.length} cards`);

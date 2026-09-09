@@ -5,27 +5,50 @@ alwaysApply: true
 
 This project follows strict patterns for data handling, database operations, and validation to ensure security, type safety, and maintainable architecture.
 
-## Data Retrieval Rules
+## Query Organization Rules
 
-**ALL data retrieval MUST be done via Server Components**
+**ALL database operations MUST use helper functions from the `db/queries` directory**
 
-- Use Server Components for fetching data from the database
-- Import and use Drizzle queries directly in Server Components
-- NEVER fetch data in Client Components - pass data down as props
-- Follow the security patterns from [clerk-auth-security.mdc](mdc:.cursor/rules/clerk-auth-security.mdc)
+- Create dedicated query functions in `db/queries` for all database operations
+- Organize queries by domain (e.g., `db/queries/decks.ts`, `db/queries/cards.ts`)
+- NEVER write raw Drizzle queries directly in Server Components or Server Actions
+- Export typed query functions that handle authentication and data validation
+- Follow security patterns from [clerk-auth-security.mdc](mdc:.cursor/rules/clerk-auth-security.mdc)
 - Follow database patterns from [drizzle-database.mdc](mdc:.cursor/rules/drizzle-database.mdc)
 
+## Data Retrieval Rules
+
+**ALL data retrieval MUST be done via Server Components using query helper functions**
+
+- Use Server Components for fetching data from the database
+- Import and call query functions from `db/queries` directory
+- NEVER fetch data in Client Components - pass data down as props
+- NEVER write raw Drizzle queries in components
+
 ```typescript
-// ✅ CORRECT: Server Component data fetching
+// ✅ CORRECT: Server Component data fetching using query helpers
+import { getUserDecks } from '@/db/queries/decks';
+
 export default async function DecksPage() {
   const { userId } = auth();
   if (!userId) redirect('/sign-in');
   
-  const decks = await db.select()
-    .from(decksTable)
-    .where(eq(decksTable.userId, userId));
+  const decks = await getUserDecks(userId);
     
   return <DecksList decks={decks} />;
+}
+```
+
+```typescript
+// ✅ CORRECT: Query helper function in db/queries/decks.ts
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+
+export async function getUserDecks(userId: string) {
+  return await db.select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
 }
 ```
 
@@ -43,16 +66,20 @@ export default function DecksPage() {
 
 ## Database Operations Rules
 
-**ALL database mutations (INSERT/UPDATE/DELETE) MUST use Server Actions**
+**ALL database mutations (INSERT/UPDATE/DELETE) MUST use Server Actions with query helper functions**
 
 - Create server actions for all database write operations
+- Server actions MUST call mutation functions from `db/queries` directory
 - NEVER use API routes for database mutations
+- NEVER write raw Drizzle queries in server actions
 - Always validate user authentication and ownership in server actions
 - Follow security patterns to prevent unauthorized access
 
 ```typescript
-// ✅ CORRECT: Server Action for database mutation
+// ✅ CORRECT: Server Action using mutation helper
 'use server';
+
+import { createDeckForUser } from '@/db/queries/decks';
 
 export async function createDeck(data: CreateDeckInput) {
   const { userId } = auth();
@@ -61,9 +88,21 @@ export async function createDeck(data: CreateDeckInput) {
   // Validate input with Zod (see validation rules below)
   const validatedData = createDeckSchema.parse(data);
   
+  const newDeck = await createDeckForUser(userId, validatedData);
+  
+  return newDeck;
+}
+```
+
+```typescript
+// ✅ CORRECT: Mutation helper function in db/queries/decks.ts
+import { db } from '@/db';
+import { decksTable } from '@/db/schema';
+
+export async function createDeckForUser(userId: string, data: CreateDeckInput) {
   const [newDeck] = await db.insert(decksTable)
     .values({
-      ...validatedData,
+      ...data,
       userId,
     })
     .returning();
@@ -77,6 +116,99 @@ export async function createDeck(data: CreateDeckInput) {
 // DO NOT create API routes like /api/decks for mutations
 export async function POST(request: Request) {
   // This pattern is forbidden
+}
+```
+
+```typescript
+// ❌ INCORRECT: Raw Drizzle queries in server actions
+'use server';
+
+export async function createDeck(data: CreateDeckInput) {
+  const { userId } = auth();
+  if (!userId) throw new Error('Unauthorized');
+  
+  // DO NOT write raw queries in server actions
+  const [newDeck] = await db.insert(decksTable)
+    .values({ ...data, userId })
+    .returning();
+    
+  return newDeck;
+}
+```
+
+## Query Organization Structure
+
+**Structure the `db/queries` directory by domain:**
+
+```
+db/
+├── queries/
+│   ├── decks.ts      # All deck-related queries
+│   ├── cards.ts      # All card-related queries
+├── schema.ts         # Database schema definitions
+└── index.ts          # Database connection
+```
+
+**Query function naming conventions:**
+
+- **Read operations**: `getUserDecks()`, `getDeckById()`, `getCardsByDeck()`
+- **Create operations**: `createDeckForUser()`, `createCardForDeck()`
+- **Update operations**: `updateUserDeck()`, `updateDeckCard()`
+- **Delete operations**: `deleteUserDeck()`, `deleteDeckCard()`
+
+**Query function patterns:**
+
+```typescript
+// ✅ CORRECT: Query helper functions in db/queries/decks.ts
+import { db } from '@/db';
+import { decksTable, cardsTable } from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+
+// Read operations
+export async function getUserDecks(userId: string) {
+  return await db.select()
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId))
+    .orderBy(desc(decksTable.createdAt));
+}
+
+export async function getDeckWithCards(deckId: string, userId: string) {
+  return await db.select()
+    .from(decksTable)
+    .leftJoin(cardsTable, eq(decksTable.id, cardsTable.deckId))
+    .where(and(
+      eq(decksTable.id, deckId),
+      eq(decksTable.userId, userId)
+    ));
+}
+
+// Create operations
+export async function createDeckForUser(userId: string, data: CreateDeckInput) {
+  const [newDeck] = await db.insert(decksTable)
+    .values({ ...data, userId })
+    .returning();
+  return newDeck;
+}
+
+// Update operations
+export async function updateUserDeck(deckId: string, userId: string, data: UpdateDeckInput) {
+  const [updatedDeck] = await db.update(decksTable)
+    .set({ ...data, updatedAt: new Date() })
+    .where(and(
+      eq(decksTable.id, deckId),
+      eq(decksTable.userId, userId)
+    ))
+    .returning();
+  return updatedDeck;
+}
+
+// Delete operations
+export async function deleteUserDeck(deckId: string, userId: string) {
+  await db.delete(decksTable)
+    .where(and(
+      eq(decksTable.id, deckId),
+      eq(decksTable.userId, userId)
+    ));
 }
 ```
 
@@ -150,16 +282,36 @@ export async function updateDeck(
 
 **Combine these patterns for complete data flow:**
 
-1. **Server Component** → fetches data → passes to Client Component as props
+1. **Server Component** → calls query helper → passes data to Client Component as props
 2. **Client Component** → collects user input → calls Server Action with typed data
-3. **Server Action** → validates with Zod → performs database mutation → revalidates
+3. **Server Action** → validates with Zod → calls mutation helper → revalidates
 
 ```typescript
 // Server Component
+import { getDeckWithCards } from '@/db/queries/decks';
+
 export default async function DeckPage({ params }: { params: { id: string } }) {
-  const deck = await getDeckById(params.id);  // Server-side data fetch
+  const { userId } = auth();
+  if (!userId) redirect('/sign-in');
+  
+  const deck = await getDeckWithCards(params.id, userId);  // Query helper function
   
   return <DeckEditor deck={deck} />;  // Pass data as props
+}
+
+// Server Action
+'use server';
+import { updateUserDeck } from '@/db/queries/decks';
+
+export async function updateDeck(deckId: string, data: UpdateDeckInput) {
+  const { userId } = auth();
+  if (!userId) throw new Error('Unauthorized');
+  
+  const validatedData = updateDeckSchema.parse(data);
+  const updatedDeck = await updateUserDeck(deckId, userId, validatedData);  // Mutation helper
+  
+  revalidatePath('/dashboard');
+  return updatedDeck;
 }
 
 // Client Component
@@ -176,16 +328,25 @@ export function DeckEditor({ deck }: { deck: Deck }) {
 
 ## Error Handling
 
-- Always handle Zod validation errors appropriately
+- Always handle Zod validation errors appropriately in server actions
 - Return user-friendly error messages from server actions
 - Use proper error boundaries for unexpected errors
 - Log validation failures for debugging
+- Query helper functions should handle database-specific errors
+- Server actions should handle validation and authorization errors
 
 ```typescript
+// Server Action error handling
 export async function createDeck(data: CreateDeckInput) {
   try {
+    const { userId } = auth();
+    if (!userId) throw new Error('Unauthorized');
+    
     const validatedData = createDeckSchema.parse(data);
-    // ... database operation
+    const newDeck = await createDeckForUser(userId, validatedData);
+    
+    revalidatePath('/dashboard');
+    return newDeck;
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new Error(`Validation failed: ${error.errors.map(e => e.message).join(', ')}`);
@@ -193,6 +354,28 @@ export async function createDeck(data: CreateDeckInput) {
     throw error;
   }
 }
+
+// Query helper error handling
+export async function createDeckForUser(userId: string, data: CreateDeckInput) {
+  try {
+    const [newDeck] = await db.insert(decksTable)
+      .values({ ...data, userId })
+      .returning();
+    return newDeck;
+  } catch (error) {
+    console.error('Database error creating deck:', error);
+    throw new Error('Failed to create deck');
+  }
+}
 ```
+
+## Benefits of This Pattern
+
+- **Separation of Concerns**: Database logic is isolated in query helpers
+- **Reusability**: Query functions can be shared across multiple server actions and components
+- **Testability**: Query helpers can be unit tested independently
+- **Maintainability**: Database queries are centralized and easy to update
+- **Type Safety**: Full end-to-end type safety from database to UI
+- **Security**: Consistent user authentication and data filtering patterns
 
 These patterns ensure type safety, security, and maintainable architecture across the entire application.

@@ -15,7 +15,7 @@ This project uses **Clerk** for authentication and authorization. It is **CRITIC
 ### 2. Authentication Requirements
 - Use Clerk's `auth()` helper to get the current user context
 - Validate user authentication before any data operations
-- Handle unauthenticated users appropriately (redirect to sign-in)
+- Handle unauthenticated users appropriately (redirect to homepage)
 
 ## Database Query Security Patterns
 
@@ -29,8 +29,8 @@ import { eq, and } from 'drizzle-orm';
 // Get current user
 const { userId } = auth();
 if (!userId) {
-  // Handle unauthenticated user
-  redirect('/sign-in');
+  // Handle unauthenticated user (redirect to homepage where auth buttons are)
+  redirect('/');
 }
 
 // ALWAYS filter by userId for user-owned resources
