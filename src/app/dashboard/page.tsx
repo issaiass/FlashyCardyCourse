@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CreateDeckDialog } from "@/components/CreateDeckDialog";
+import { StartStudyDialog } from "@/components/StartStudyDialog";
 import { getUserDecksWithCardCounts } from "@/db/queries/decks";
 
 export default async function Dashboard() {
@@ -17,6 +18,12 @@ export default async function Dashboard() {
 
   // Fetch user's decks with card counts
   const userDecks = await getUserDecksWithCardCounts(userId);
+  const studyDecks = userDecks.map((deck) => ({
+    id: deck.id,
+    title: deck.title,
+    description: deck.description,
+    cardCount: deck.cardCount,
+  }));
 
   return (
     <div className="min-h-screen bg-background">
@@ -86,9 +93,11 @@ export default async function Dashboard() {
                       </p>
                       <Progress value={0} className="h-2" />
                     </div>
-                    <Button variant="outline" className="w-full">
-                      Start Studying
-                    </Button>
+                    <StartStudyDialog decks={studyDecks}>
+                      <Button variant="outline" className="w-full">
+                        Start Studying
+                      </Button>
+                    </StartStudyDialog>
                   </div>
                 </CardContent>
               </Card>
@@ -105,9 +114,11 @@ export default async function Dashboard() {
                     <Button variant="outline" className="w-full justify-start">
                       Browse All Decks
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      Study Session
-                    </Button>
+                    <StartStudyDialog decks={studyDecks}>
+                      <Button variant="outline" className="w-full justify-start">
+                        Study Session
+                      </Button>
+                    </StartStudyDialog>
                     <Button variant="outline" className="w-full justify-start">
                       View Statistics
                     </Button>
