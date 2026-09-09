@@ -38,7 +38,7 @@ export default async function DeckPage({
   const cards = deckWithCards
     .filter(item => item.card !== null)
     .map(item => item.card!)
-    .sort((a, b) => a.position - b.position);
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const cardCount = cards.length;
 

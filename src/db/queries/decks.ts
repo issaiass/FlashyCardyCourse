@@ -80,7 +80,7 @@ export async function getDeckWithCards(deckId: string, userId: string) {
       eq(decksTable.id, parseInt(deckId)),
       eq(decksTable.userId, userId)
     ))
-    .orderBy(cardsTable.position);
+    .orderBy(desc(cardsTable.updatedAt));
 }
 
 // CREATE OPERATIONS

@@ -33,6 +33,24 @@ async function syncCardsIdSequence() {
   `);
 }
 
+function getNextDefaultCardTitle(titles: Array<string | null>): string {
+  const usedNumbers = new Set<number>();
+
+  for (const title of titles) {
+    const match = title?.trim().match(/^Card(\d+)$/);
+    if (match) {
+      usedNumbers.add(Number(match[1]));
+    }
+  }
+
+  let nextNumber = 1;
+  while (usedNumbers.has(nextNumber)) {
+    nextNumber += 1;
+  }
+
+  return `Card${nextNumber}`;
+}
+
 // READ OPERATIONS
 
 /**
@@ -53,7 +71,7 @@ export async function getCardsByDeck(deckId: string, userId: string) {
       eq(cardsTable.deckId, parseInt(deckId)),
       eq(decksTable.userId, userId)
     ))
-    .orderBy(cardsTable.position);
+    .orderBy(desc(cardsTable.updatedAt));
 }
 
 /**
@@ -118,22 +136,29 @@ export async function createCardForDeck(deckId: string, userId: string, data: Cr
       throw new Error('Deck not found or access denied');
     }
 
+    const existingCards = await db.select({
+      position: cardsTable.position,
+      title: cardsTable.title,
+    })
+      .from(cardsTable)
+      .where(eq(cardsTable.deckId, parsedDeckId));
+
     // Get the next position if not provided
     let position = data.position;
     if (position === undefined) {
-      const [lastCard] = await db.select({ position: cardsTable.position })
-        .from(cardsTable)
-        .where(eq(cardsTable.deckId, parsedDeckId))
-        .orderBy(desc(cardsTable.position))
-        .limit(1);
-
-      position = lastCard ? lastCard.position + 1 : 1;
+      const lastPosition = existingCards.reduce(
+        (max, card) => (card.position > max ? card.position : max),
+        0
+      );
+      position = lastPosition + 1;
     }
+
+    const title = data.title?.trim() || getNextDefaultCardTitle(existingCards.map((card) => card.title));
 
     const insertCard = async () => {
       const [newCard] = await db.insert(cardsTable)
         .values({
-          title: data.title?.trim() || null,
+          title,
           front: data.front,
           back: data.back,
           deckId: parsedDeckId,

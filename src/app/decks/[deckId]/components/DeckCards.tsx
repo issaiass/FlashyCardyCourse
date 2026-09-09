@@ -90,7 +90,7 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
       <div className="space-y-3">
         {cards.map((card, index) => {
           const isExpanded = expandedCards.has(card.id);
-          const cardTitle = card.title?.trim() ? card.title.trim() : `Card ${index + 1}`;
+          const cardTitle = card.title?.trim() ? card.title.trim() : `Card${index + 1}`;
 
           return (
             <Card key={card.id} className="transition-all duration-200">

@@ -11,6 +11,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { createCard } from '@/actions/card-actions';
 
@@ -25,6 +26,7 @@ export function CreateCardDialog({ deckId, children }: CreateCardDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [formData, setFormData] = useState({
+    title: '',
     front: '',
     back: '',
   });
@@ -42,13 +44,14 @@ export function CreateCardDialog({ deckId, children }: CreateCardDialogProps) {
 
     try {
       const result = await createCard(String(deckId), {
+        title: formData.title.trim() || null,
         front: formData.front.trim(),
         back: formData.back.trim(),
       });
 
       if (result.success) {
         setMessage({ type: 'success', text: 'Card created successfully!' });
-        setFormData({ front: '', back: '' });
+        setFormData({ title: '', front: '', back: '' });
         router.refresh();
         setTimeout(() => {
           setOpen(false);
@@ -73,7 +76,7 @@ export function CreateCardDialog({ deckId, children }: CreateCardDialogProps) {
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setMessage(null);
-      setFormData({ front: '', back: '' });
+      setFormData({ title: '', front: '', back: '' });
     }
     setOpen(newOpen);
   };
@@ -102,6 +105,18 @@ export function CreateCardDialog({ deckId, children }: CreateCardDialogProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="create-card-title" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Title (Optional)
+            </label>
+            <Input
+              id="create-card-title"
+              placeholder="Leave blank to use Card1, Card2, ..."
+              value={formData.title}
+              onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+            />
+          </div>
+
           <div className="space-y-2">
             <label htmlFor="front" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
               Front (Question)
