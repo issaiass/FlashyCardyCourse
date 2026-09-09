@@ -14,6 +14,7 @@ export const decksTable = pgTable("decks", {
 export const cardsTable = pgTable("cards", {
   id: integer().primaryKey().generatedAlwaysAsIdentity(),
   deckId: integer("deck_id").references(() => decksTable.id, { onDelete: 'cascade' }).notNull(),
+  title: varchar({ length: 255 }),
   front: text().notNull(), // Front side of the card (question/prompt)
   back: text().notNull(),  // Back side of the card (answer)
   position: integer().default(0).notNull(), // For ordering cards within a deck

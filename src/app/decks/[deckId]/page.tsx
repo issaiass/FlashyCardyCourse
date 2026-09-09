@@ -8,6 +8,7 @@ import { ArrowLeft, Edit, Plus } from 'lucide-react';
 import Link from 'next/link';
 import DeckCards from './components/DeckCards';
 import { CreateCardDialog } from '@/components/CreateCardDialog';
+import { EditDeckDialog } from '@/components/EditDeckDialog';
 
 export default async function DeckPage({
   params,
@@ -67,12 +68,17 @@ export default async function DeckPage({
               <Badge variant="secondary">
                 {cardCount} {cardCount === 1 ? 'card' : 'cards'}
               </Badge>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/decks/${deck.id}/edit`}>
+              <EditDeckDialog
+                key={deck.updatedAt.toISOString()}
+                deckId={deck.id}
+                title={deck.title}
+                description={deck.description}
+              >
+                <Button variant="outline" size="sm">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Deck
-                </Link>
-              </Button>
+                </Button>
+              </EditDeckDialog>
               <CreateCardDialog deckId={deck.id}>
                 <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />

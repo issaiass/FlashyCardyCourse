@@ -133,6 +133,7 @@ export async function createCardForDeck(deckId: string, userId: string, data: Cr
     const insertCard = async () => {
       const [newCard] = await db.insert(cardsTable)
         .values({
+          title: data.title?.trim() || null,
           front: data.front,
           back: data.back,
           deckId: parsedDeckId,

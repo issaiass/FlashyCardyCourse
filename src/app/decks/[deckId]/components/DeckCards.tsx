@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, Edit, Trash2 } from 'lucide-react';
-import Link from 'next/link';
+import { EditCardDialog } from '@/components/EditCardDialog';
+import { DeleteCardDialog } from '@/components/DeleteCardDialog';
 
 interface CardData {
   id: number;
   deckId: number;
+  title: string | null;
   front: string;
   back: string;
   position: number;
@@ -25,6 +27,8 @@ interface DeckCardsProps {
 export default function DeckCards({ cards, deckId }: DeckCardsProps) {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
   const [revealedAnswers, setRevealedAnswers] = useState<Set<number>>(new Set());
+  const [editingCard, setEditingCard] = useState<CardData | null>(null);
+  const [deletingCard, setDeletingCard] = useState<CardData | null>(null);
 
   const toggleCard = (cardId: number) => {
     const isCurrentlyExpanded = expandedCards.has(cardId);
@@ -69,7 +73,6 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={expandAll}>
@@ -84,11 +87,11 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
         </Badge>
       </div>
 
-      {/* Cards List */}
       <div className="space-y-3">
         {cards.map((card, index) => {
           const isExpanded = expandedCards.has(card.id);
-          
+          const cardTitle = card.title?.trim() ? card.title.trim() : `Card ${index + 1}`;
+
           return (
             <Card key={card.id} className="transition-all duration-200">
               <CardHeader className="pb-3">
@@ -99,9 +102,9 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
                     </Badge>
                     <div className="flex-1 min-w-0">
                       <CardTitle className="text-base font-medium">
-                        Card {index + 1}
+                        {cardTitle}
                       </CardTitle>
-                      <div 
+                      <div
                         className="mt-2 cursor-pointer"
                         onClick={() => toggleCard(card.id)}
                       >
@@ -116,14 +119,22 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/decks/${deckId}/cards/${card.id}/edit`}>
-                        <Edit className="h-4 w-4" />
-                      </Link>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Edit card"
+                      onClick={() => setEditingCard(card)}
+                    >
+                      <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Delete card"
+                      onClick={() => setDeletingCard(card)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -133,7 +144,6 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
               {isExpanded && (
                 <CardContent className="pt-0">
                   <div className="grid md:grid-cols-2 gap-4">
-                    {/* Front Side */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
@@ -148,7 +158,6 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
                       </div>
                     </div>
 
-                    {/* Back Side */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="h-2 w-2 bg-green-500 rounded-full"></div>
@@ -189,7 +198,6 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
                     </div>
                   </div>
 
-                  {/* Card Metadata */}
                   <div className="mt-4 pt-4 border-t">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>
@@ -206,6 +214,36 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
           );
         })}
       </div>
+
+      <EditCardDialog
+        cardId={editingCard?.id ?? 0}
+        deckId={deckId}
+        title={editingCard?.title ?? null}
+        front={editingCard?.front ?? ''}
+        back={editingCard?.back ?? ''}
+        open={editingCard !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCard(null);
+          }
+        }}
+      />
+
+      <DeleteCardDialog
+        cardId={deletingCard?.id ?? 0}
+        deckId={deckId}
+        cardLabel={
+          deletingCard?.title?.trim()
+            || deletingCard?.front?.trim()
+            || 'this card'
+        }
+        open={deletingCard !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingCard(null);
+          }
+        }}
+      />
     </div>
   );
 }
