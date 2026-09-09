@@ -24,16 +24,37 @@ interface DeckCardsProps {
 
 export default function DeckCards({ cards, deckId }: DeckCardsProps) {
   const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
+  const [revealedAnswers, setRevealedAnswers] = useState<Set<number>>(new Set());
 
   const toggleCard = (cardId: number) => {
+    const isCurrentlyExpanded = expandedCards.has(cardId);
     setExpandedCards(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(cardId)) {
+      if (isCurrentlyExpanded) {
         newSet.delete(cardId);
       } else {
         newSet.add(cardId);
       }
       return newSet;
+    });
+    if (isCurrentlyExpanded) {
+      setRevealedAnswers(prev => {
+        const next = new Set(prev);
+        next.delete(cardId);
+        return next;
+      });
+    }
+  };
+
+  const toggleAnswerReveal = (cardId: number) => {
+    setRevealedAnswers(prev => {
+      const next = new Set(prev);
+      if (next.has(cardId)) {
+        next.delete(cardId);
+      } else {
+        next.add(cardId);
+      }
+      return next;
     });
   };
 
@@ -43,6 +64,7 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
 
   const collapseAll = () => {
     setExpandedCards(new Set());
+    setRevealedAnswers(new Set());
   };
 
   return (
@@ -119,8 +141,8 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
                           Front (Question)
                         </span>
                       </div>
-                      <div className="bg-muted/50 rounded-lg p-4 min-h-20">
-                        <div className="text-sm whitespace-pre-wrap">
+                      <div className="flex min-h-20 items-center justify-center bg-muted/50 rounded-lg p-4">
+                        <div className="text-sm text-center whitespace-pre-wrap">
                           {card.front}
                         </div>
                       </div>
@@ -134,11 +156,36 @@ export default function DeckCards({ cards, deckId }: DeckCardsProps) {
                           Back (Answer)
                         </span>
                       </div>
-                      <div className="bg-muted/50 rounded-lg p-4 min-h-20">
-                        <div className="text-sm whitespace-pre-wrap">
-                          {card.back}
-                        </div>
-                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-pressed={revealedAnswers.has(card.id)}
+                        aria-label={
+                          revealedAnswers.has(card.id)
+                            ? 'Hide answer'
+                            : 'Reveal answer'
+                        }
+                        onClick={() => toggleAnswerReveal(card.id)}
+                        className="flex h-auto min-h-20 w-full items-center justify-center whitespace-normal bg-muted/50 rounded-lg p-4 hover:bg-muted"
+                      >
+                        <span className="relative flex w-full items-center justify-center">
+                          <span
+                            aria-hidden={!revealedAnswers.has(card.id)}
+                            className={`block text-sm text-center whitespace-pre-wrap transition-[filter] duration-200 ${
+                              revealedAnswers.has(card.id)
+                                ? 'blur-none select-text'
+                                : 'blur-xl select-none pointer-events-none'
+                            }`}
+                          >
+                            {card.back}
+                          </span>
+                          {!revealedAnswers.has(card.id) && (
+                            <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-muted-foreground">
+                              Click to reveal answer
+                            </span>
+                          )}
+                        </span>
+                      </Button>
                     </div>
                   </div>
 

@@ -1,7 +1,37 @@
 import { db } from '@/db';
 import { cardsTable, decksTable } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import type { CreateCardInput, UpdateCardInput } from '@/lib/validations';
+
+function isCardsPrimaryKeyConflict(error: unknown): boolean {
+  const candidates = [error];
+  if (error instanceof Error && 'cause' in error) {
+    candidates.push(error.cause);
+  }
+
+  return candidates.some((candidate) => {
+    if (!candidate || typeof candidate !== 'object') {
+      return false;
+    }
+
+    const { code, constraint } = candidate as {
+      code?: string;
+      constraint?: string;
+    };
+
+    return code === '23505' && (!constraint || constraint === 'cards_pkey');
+  });
+}
+
+async function syncCardsIdSequence() {
+  await db.execute(sql`
+    SELECT setval(
+      pg_get_serial_sequence('cards', 'id'),
+      COALESCE((SELECT MAX(${cardsTable.id}) FROM ${cardsTable}), 1),
+      true
+    )
+  `);
+}
 
 // READ OPERATIONS
 
@@ -73,39 +103,65 @@ export async function getCardsByDeckId(deckId: number) {
  * Create a new card for a deck (with user ownership verification)
  */
 export async function createCardForDeck(deckId: string, userId: string, data: CreateCardInput) {
-  // First verify the user owns the deck
-  const [deckOwnership] = await db.select({ id: decksTable.id })
-    .from(decksTable)
-    .where(and(
-      eq(decksTable.id, parseInt(deckId)),
-      eq(decksTable.userId, userId)
-    ));
-  
-  if (!deckOwnership) {
-    throw new Error('Deck not found or access denied');
+  try {
+    const parsedDeckId = parseInt(deckId);
+
+    // First verify the user owns the deck
+    const [deckOwnership] = await db.select({ id: decksTable.id })
+      .from(decksTable)
+      .where(and(
+        eq(decksTable.id, parsedDeckId),
+        eq(decksTable.userId, userId)
+      ));
+
+    if (!deckOwnership) {
+      throw new Error('Deck not found or access denied');
+    }
+
+    // Get the next position if not provided
+    let position = data.position;
+    if (position === undefined) {
+      const [lastCard] = await db.select({ position: cardsTable.position })
+        .from(cardsTable)
+        .where(eq(cardsTable.deckId, parsedDeckId))
+        .orderBy(desc(cardsTable.position))
+        .limit(1);
+
+      position = lastCard ? lastCard.position + 1 : 1;
+    }
+
+    const insertCard = async () => {
+      const [newCard] = await db.insert(cardsTable)
+        .values({
+          front: data.front,
+          back: data.back,
+          deckId: parsedDeckId,
+          position
+        })
+        .returning();
+
+      return newCard;
+    };
+
+    try {
+      return await insertCard();
+    } catch (insertError) {
+      // Identity/serial sequences can fall behind existing IDs after seed data
+      // or schema pushes, causing duplicate primary key errors on insert.
+      if (!isCardsPrimaryKeyConflict(insertError)) {
+        throw insertError;
+      }
+
+      await syncCardsIdSequence();
+      return await insertCard();
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Deck not found or access denied') {
+      throw error;
+    }
+    console.error('Database error creating card:', error);
+    throw new Error('Failed to create card');
   }
-  
-  // Get the next position if not provided
-  let position = data.position;
-  if (!position) {
-    const [lastCard] = await db.select({ position: cardsTable.position })
-      .from(cardsTable)
-      .where(eq(cardsTable.deckId, parseInt(deckId)))
-      .orderBy(desc(cardsTable.position))
-      .limit(1);
-    
-    position = lastCard ? lastCard.position + 1 : 1;
-  }
-  
-  const [newCard] = await db.insert(cardsTable)
-    .values({
-      ...data,
-      deckId: parseInt(deckId),
-      position
-    })
-    .returning();
-  
-  return newCard;
 }
 
 /**

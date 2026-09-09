@@ -119,12 +119,7 @@ export default async function Dashboard() {
 
           {/* Deck List Section */}
           <section className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-semibold">My Decks</h2>
-              <CreateDeckDialog>
-                <Button>Create New Deck</Button>
-              </CreateDeckDialog>
-            </div>
+            <h2 className="text-2xl font-semibold mb-6">My Decks</h2>
             
             {userDecks.length === 0 ? (
               <Card>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Edit, Plus } from 'lucide-react';
 import Link from 'next/link';
 import DeckCards from './components/DeckCards';
+import { CreateCardDialog } from '@/components/CreateCardDialog';
 
 export default async function DeckPage({
   params,
@@ -72,12 +73,12 @@ export default async function DeckPage({
                   Edit Deck
                 </Link>
               </Button>
-              <Button size="sm" asChild>
-                <Link href={`/decks/${deck.id}/cards/new`}>
+              <CreateCardDialog deckId={deck.id}>
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Card
-                </Link>
-              </Button>
+                </Button>
+              </CreateCardDialog>
             </div>
           </div>
         </div>
@@ -135,12 +136,12 @@ export default async function DeckPage({
                   <p className="text-sm text-muted-foreground max-w-md">
                     Get started by adding your first flashcard to this deck.
                   </p>
-                  <Button asChild>
-                    <Link href={`/decks/${deck.id}/cards/new`}>
+                  <CreateCardDialog deckId={deck.id}>
+                    <Button>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Your First Card
-                    </Link>
-                  </Button>
+                    </Button>
+                  </CreateCardDialog>
                 </div>
               </CardContent>
             </Card>
