@@ -11,7 +11,8 @@
     "db:generate": "npx drizzle-kit generate",
     "db:migrate": "npx drizzle-kit migrate",
     "db:studio": "npx drizzle-kit studio",
-    "db:migrate:custom": "npx tsx src/migrate.ts"
+    "db:migrate:custom": "npx tsx src/migrate.ts",
+    "db:populate": "npx tsx src/db/populate-example-data.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.1",
