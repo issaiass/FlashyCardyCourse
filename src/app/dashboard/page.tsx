@@ -1,9 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { CreateDeckDialog } from "@/components/CreateDeckDialog";
+import { getUserDecksWithCardCounts } from "@/db/queries/decks";
 
 export default async function Dashboard() {
   const { userId } = await auth();
@@ -11,6 +14,9 @@ export default async function Dashboard() {
   if (!userId) {
     redirect('/');
   }
+
+  // Fetch user's decks with card counts
+  const userDecks = await getUserDecksWithCardCounts(userId);
 
   return (
     <div className="min-h-screen bg-background">
@@ -38,7 +44,7 @@ export default async function Dashboard() {
                 <CardHeader>
                   <CardTitle className="flex items-center justify-between">
                     My Decks
-                    <Badge variant="outline">0</Badge>
+                    <Badge variant="outline">{userDecks.length}</Badge>
                   </CardTitle>
                   <CardDescription>
                     Manage your flashcard collections
@@ -47,14 +53,16 @@ export default async function Dashboard() {
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <div className="text-2xl font-bold mb-1">0</div>
+                      <div className="text-2xl font-bold mb-1">{userDecks.length}</div>
                       <p className="text-sm text-muted-foreground">
                         Total decks created
                       </p>
                     </div>
-                    <Button className="w-full">
-                      Create New Deck
-                    </Button>
+                    <CreateDeckDialog>
+                      <Button className="w-full">
+                        Create New Deck
+                      </Button>
+                    </CreateDeckDialog>
                   </div>
                 </CardContent>
               </Card>
@@ -107,6 +115,82 @@ export default async function Dashboard() {
                 </CardContent>
               </Card>
             </div>
+          </section>
+
+          {/* Deck List Section */}
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold">My Decks</h2>
+              <CreateDeckDialog>
+                <Button>Create New Deck</Button>
+              </CreateDeckDialog>
+            </div>
+            
+            {userDecks.length === 0 ? (
+              <Card>
+                <CardContent className="p-8">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <div className="text-muted-foreground mb-4">
+                      <svg
+                        className="w-12 h-12 mx-auto mb-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">No decks yet</h3>
+                    <p className="text-muted-foreground mb-6 max-w-sm">
+                      Create your first flashcard deck to start learning and studying effectively.
+                    </p>
+                    <CreateDeckDialog>
+                      <Button>Create Your First Deck</Button>
+                    </CreateDeckDialog>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {userDecks.map((deck) => (
+                  <Link key={deck.id} href={`/decks/${deck.id}`} className="block h-full">
+                    <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <CardTitle className="text-lg line-clamp-2">
+                            {deck.title}
+                          </CardTitle>
+                          <Badge variant="secondary" className="ml-2 flex-shrink-0">
+                            {deck.cardCount} {deck.cardCount === 1 ? 'card' : 'cards'}
+                          </Badge>
+                        </div>
+                        {deck.description && (
+                          <CardDescription className="line-clamp-2">
+                            {deck.description}
+                          </CardDescription>
+                        )}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between text-sm text-muted-foreground">
+                          <span>
+                            Created {new Date(deck.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="text-primary font-medium">
+                            View Deck →
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
 
           <section>

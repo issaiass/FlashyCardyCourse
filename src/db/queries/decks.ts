@@ -1,7 +1,18 @@
 import { db } from '@/db';
 import { decksTable, cardsTable } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import type { CreateDeckInput, UpdateDeckInput } from '@/lib/validations';
+
+// Type for deck with card count
+export type DeckWithCardCount = {
+  id: number;
+  title: string;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  cardCount: number;
+};
 
 // READ OPERATIONS
 
@@ -13,6 +24,32 @@ export async function getUserDecks(userId: string) {
     .from(decksTable)
     .where(eq(decksTable.userId, userId))
     .orderBy(desc(decksTable.createdAt));
+}
+
+/**
+ * Get all decks for a specific user with card counts
+ */
+export async function getUserDecksWithCardCounts(userId: string): Promise<DeckWithCardCount[]> {
+  const result = await db.select({
+    id: decksTable.id,
+    title: decksTable.title,
+    description: decksTable.description,
+    createdAt: decksTable.createdAt,
+    updatedAt: decksTable.updatedAt,
+    userId: decksTable.userId,
+    cardCount: sql<number>`count(${cardsTable.id})`.as('cardCount')
+  })
+    .from(decksTable)
+    .leftJoin(cardsTable, eq(decksTable.id, cardsTable.deckId))
+    .where(eq(decksTable.userId, userId))
+    .groupBy(decksTable.id)
+    .orderBy(desc(decksTable.createdAt));
+
+  // Convert the count from string to number if needed
+  return result.map(deck => ({
+    ...deck,
+    cardCount: Number(deck.cardCount) || 0
+  }));
 }
 
 /**
@@ -46,15 +83,6 @@ export async function getDeckWithCards(deckId: string, userId: string) {
     .orderBy(cardsTable.position);
 }
 
-/**
- * Get all decks (no user filter) - for system operations only
- */
-export async function getAllDecks() {
-  return await db.select()
-    .from(decksTable)
-    .orderBy(desc(decksTable.createdAt));
-}
-
 // CREATE OPERATIONS
 
 /**
@@ -66,17 +94,6 @@ export async function createDeckForUser(userId: string, data: CreateDeckInput) {
       ...data,
       userId,
     })
-    .returning();
-  
-  return newDeck;
-}
-
-/**
- * Create a deck with a specific user ID (for seeding/testing)
- */
-export async function createDeck(deckData: typeof decksTable.$inferInsert) {
-  const [newDeck] = await db.insert(decksTable)
-    .values(deckData)
     .returning();
   
   return newDeck;
@@ -113,12 +130,4 @@ export async function deleteUserDeck(deckId: string, userId: string) {
       eq(decksTable.id, parseInt(deckId)),
       eq(decksTable.userId, userId)
     ));
-}
-
-/**
- * Delete deck by ID (no user filter) - for system operations only
- */
-export async function deleteDeckById(deckId: number) {
-  await db.delete(decksTable)
-    .where(eq(decksTable.id, deckId));
 }
