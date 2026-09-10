@@ -4,11 +4,12 @@ import { getDeckWithCards } from '@/db/queries/decks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Edit, Plus } from 'lucide-react';
+import { ArrowLeft, Edit, Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import DeckCards from './components/DeckCards';
 import { CreateCardDialog } from '@/components/CreateCardDialog';
 import { EditDeckDialog } from '@/components/EditDeckDialog';
+import { DeleteDeckDialog } from '@/components/DeleteDeckDialog';
 
 export default async function DeckPage({
   params,
@@ -79,6 +80,17 @@ export default async function DeckPage({
                   Edit Deck
                 </Button>
               </EditDeckDialog>
+              <DeleteDeckDialog
+                deckId={deck.id}
+                deckTitle={deck.title}
+                cardCount={cardCount}
+                redirectTo="/dashboard"
+              >
+                <Button variant="outline" size="sm">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Deck
+                </Button>
+              </DeleteDeckDialog>
               <CreateCardDialog deckId={deck.id}>
                 <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />

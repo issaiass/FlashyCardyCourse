@@ -125,9 +125,16 @@ export async function updateUserDeck(deckId: string, userId: string, data: Updat
  * Delete a user's deck (cascade deletes cards)
  */
 export async function deleteUserDeck(deckId: string, userId: string) {
-  await db.delete(decksTable)
+  const [deletedDeck] = await db.delete(decksTable)
     .where(and(
       eq(decksTable.id, parseInt(deckId)),
       eq(decksTable.userId, userId)
-    ));
+    ))
+    .returning();
+
+  if (!deletedDeck) {
+    throw new Error('Deck not found or access denied');
+  }
+
+  return deletedDeck;
 }

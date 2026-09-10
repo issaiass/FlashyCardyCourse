@@ -1,11 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CreateDeckDialog } from "@/components/CreateDeckDialog";
+import { DeckListCard } from "@/components/DeckListCard";
 import { StartStudyDialog } from "@/components/StartStudyDialog";
 import { getUserDecksWithCardCounts } from "@/db/queries/decks";
 
@@ -165,35 +165,7 @@ export default async function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {userDecks.map((deck) => (
-                  <Link key={deck.id} href={`/decks/${deck.id}`} className="block h-full">
-                    <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <CardTitle className="text-lg line-clamp-2">
-                            {deck.title}
-                          </CardTitle>
-                          <Badge variant="secondary" className="ml-2 flex-shrink-0">
-                            {deck.cardCount} {deck.cardCount === 1 ? 'card' : 'cards'}
-                          </Badge>
-                        </div>
-                        {deck.description && (
-                          <CardDescription className="line-clamp-2">
-                            {deck.description}
-                          </CardDescription>
-                        )}
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center justify-between text-sm text-muted-foreground">
-                          <span>
-                            Created {new Date(deck.createdAt).toLocaleDateString()}
-                          </span>
-                          <span className="text-primary font-medium">
-                            View Deck →
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                  <DeckListCard key={deck.id} deck={deck} />
                 ))}
               </div>
             )}

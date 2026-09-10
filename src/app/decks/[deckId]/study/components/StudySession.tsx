@@ -81,32 +81,38 @@ export function StudySession({ cards }: StudySessionProps) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
         return;
       }
 
-      if (event.code === 'Space' || event.key === 'Enter') {
+      const isSpace = event.code === 'Space' || event.key === ' ';
+
+      if (isSpace) {
         event.preventDefault();
+        event.stopPropagation();
         if (!isComplete) {
           setIsFlipped((current) => !current);
         }
         return;
       }
 
-      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      if (event.key === 'ArrowRight') {
         event.preventDefault();
         goToNext();
         return;
       }
 
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      if (event.key === 'ArrowLeft') {
         event.preventDefault();
         goToPrevious();
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [goToNext, goToPrevious, isComplete]);
 
   if (isComplete) {
@@ -149,7 +155,7 @@ export function StudySession({ cards }: StudySessionProps) {
             Card {index + 1} of {total}
           </Badge>
           <p className="text-sm text-muted-foreground">
-            Space to flip · Arrows to navigate
+            ← previous · Space to flip · next →
           </p>
         </div>
         <Progress value={progressValue} className="h-2" />

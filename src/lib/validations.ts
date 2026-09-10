@@ -11,6 +11,10 @@ export const updateDeckSchema = z.object({
   description: z.string().optional().nullable(),
 });
 
+export const deleteDeckSchema = z.object({
+  deckId: z.string().regex(/^\d+$/, 'Invalid deck'),
+});
+
 // Card validation schemas
 export const createCardSchema = z.object({
   title: z.string().max(255, 'Title must be less than 255 characters').optional().nullable(),
@@ -34,6 +38,7 @@ export const deleteCardSchema = z.object({
 // TypeScript types from Zod schemas
 export type CreateDeckInput = z.infer<typeof createDeckSchema>;
 export type UpdateDeckInput = z.infer<typeof updateDeckSchema>;
+export type DeleteDeckInput = z.infer<typeof deleteDeckSchema>;
 export type CreateCardInput = z.infer<typeof createCardSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type DeleteCardInput = z.infer<typeof deleteCardSchema>;
