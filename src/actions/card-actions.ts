@@ -25,6 +25,7 @@ export async function createCard(deckId: string, data: CreateCardInput) {
   try {
     const { userId, has } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
@@ -54,7 +55,13 @@ export async function createCard(deckId: string, data: CreateCardInput) {
       };
     }
     if (error instanceof Error) {
-      return { success: false, error: error.message };
+      if (error.message === 'Resource not found') {
+        return { success: false, error: 'Resource not found' };
+      }
+      if (error.message === 'Unauthorized') {
+        return { success: false, error: 'Unauthorized' };
+      }
+      return { success: false, error: 'Failed to create card' };
     }
     return { success: false, error: 'Failed to create card' };
   }
@@ -64,6 +71,7 @@ export async function generateCardsWithAI(data: GenerateCardsWithAIInput) {
   try {
     const { userId, has } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
@@ -133,7 +141,7 @@ Each card must be study-ready:
       };
     }
     if (error instanceof Error) {
-      if (error.message === 'Deck not found or access denied') {
+      if (error.message === 'Deck not found or access denied' || error.message === 'Resource not found') {
         return { success: false, error: 'Resource not found' };
       }
       return { success: false, error: error.message };
@@ -146,15 +154,12 @@ export async function updateCard(cardId: string, deckId: string, data: UpdateCar
   try {
     const { userId } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
     const validatedData = updateCardSchema.parse(data);
     const updatedCard = await updateUserCard(cardId, userId, validatedData);
-
-    if (!updatedCard) {
-      throw new Error('Resource not found');
-    }
 
     revalidatePath('/dashboard');
     revalidatePath(`/decks/${deckId}`);
@@ -168,7 +173,7 @@ export async function updateCard(cardId: string, deckId: string, data: UpdateCar
       };
     }
     if (error instanceof Error) {
-      if (error.message === 'Card not found or access denied') {
+      if (error.message === 'Card not found or access denied' || error.message === 'Resource not found') {
         return { success: false, error: 'Resource not found' };
       }
       return { success: false, error: error.message };
@@ -181,6 +186,7 @@ export async function deleteCard(data: DeleteCardInput) {
   try {
     const { userId } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
@@ -199,7 +205,7 @@ export async function deleteCard(data: DeleteCardInput) {
       };
     }
     if (error instanceof Error) {
-      if (error.message === 'Card not found or access denied') {
+      if (error.message === 'Card not found or access denied' || error.message === 'Resource not found') {
         return { success: false, error: 'Resource not found' };
       }
       return { success: false, error: error.message };
@@ -212,6 +218,7 @@ export async function deleteCards(data: DeleteCardsInput) {
   try {
     const { userId } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 

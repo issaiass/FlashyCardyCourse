@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { config } from 'dotenv';
-import { createDeck, createCardsForDeck } from './queries';
+import { createCardsForUserDeck, createDeckForUser } from './queries';
 
 // Load environment variables
 config({ path: '.env.local' });
@@ -13,8 +13,7 @@ async function populateExampleData() {
 
     // Create the Spanish Learning Deck
     console.log('Creating Spanish Learning deck...');
-    const spanishDeck = await createDeck({
-      userId: USER_ID,
+    const spanishDeck = await createDeckForUser(USER_ID, {
       title: 'Learn Spanish - Basic Vocabulary',
       description: 'Essential Spanish words and phrases for beginners learning from English'
     });
@@ -46,12 +45,11 @@ async function populateExampleData() {
       position: index + 1
     }));
     
-    await createCardsForDeck(spanishDeck.id, spanishCardsWithPosition);
+    await createCardsForUserDeck(String(spanishDeck.id), USER_ID, spanishCardsWithPosition);
 
     // Create the British History Deck
     console.log('Creating British History deck...');
-    const historyDeck = await createDeck({
-      userId: USER_ID,
+    const historyDeck = await createDeckForUser(USER_ID, {
       title: 'British History - Key Facts',
       description: 'Important events, dates, and figures in British history'
     });
@@ -128,7 +126,7 @@ async function populateExampleData() {
       position: index + 1
     }));
     
-    await createCardsForDeck(historyDeck.id, historyCardsWithPosition);
+    await createCardsForUserDeck(String(historyDeck.id), USER_ID, historyCardsWithPosition);
 
     console.log('✅ Successfully populated example data!');
     console.log(`📚 Created deck: "${spanishDeck.title}" with ${spanishCards.length} cards`);

@@ -146,7 +146,8 @@ export async function deleteUserDeck(deckId: string, userId: string) {
     .returning();
 
   if (!deletedDeck) {
-    throw new Error('Deck not found or access denied');
+    console.error('Security: deleteUserDeck denied', { deckId, userId });
+    throw new Error('Resource not found');
   }
 
   return deletedDeck;

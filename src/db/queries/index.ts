@@ -5,12 +5,9 @@ export {
   countUserDecks,
   getUserDeckById,
   getDeckWithCards,
-  getAllDecks,
   createDeckForUser,
-  createDeck,
   updateUserDeck,
   deleteUserDeck,
-  deleteDeckById
 } from './decks';
 
 // Export all card query functions
@@ -18,14 +15,9 @@ export {
   getCardsByDeck,
   countCardsForUserDeck,
   getUserCardById,
-  getAllCards,
-  getCardsByDeckId,
   createCardForDeck,
-  createCard,
-  createCardsForDeck,
+  createCardsForUserDeck,
   updateUserCard,
   deleteUserCard,
   deleteUserCards,
-  deleteCardsByDeckId,
-  deleteCardById
 } from './cards';

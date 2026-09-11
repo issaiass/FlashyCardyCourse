@@ -2,7 +2,49 @@ import { db } from '@/db';
 import { cardsTable, decksTable } from '@/db/schema';
 import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import type { CreateCardInput, UpdateCardInput } from '@/lib/validations';
-import { getUserDeckById } from '@/db/queries/decks';
+
+const RESOURCE_NOT_FOUND = 'Resource not found';
+
+function logOwnershipDenial(operation: string, details: Record<string, unknown>) {
+  console.error(`Security: ${operation} denied`, details);
+}
+
+function ownedCardIdsForUser(cardId: number, userId: string) {
+  return db
+    .select({ id: cardsTable.id })
+    .from(cardsTable)
+    .innerJoin(decksTable, eq(cardsTable.deckId, decksTable.id))
+    .where(and(
+      eq(cardsTable.id, cardId),
+      eq(decksTable.userId, userId)
+    ));
+}
+
+async function getOwnedDeckId(deckId: number, userId: string) {
+  const [deck] = await db
+    .select({ id: decksTable.id })
+    .from(decksTable)
+    .where(and(
+      eq(decksTable.id, deckId),
+      eq(decksTable.userId, userId)
+    ));
+
+  return deck?.id ?? null;
+}
+
+async function getOwnedDeckCardMeta(deckId: number, userId: string) {
+  return await db
+    .select({
+      position: cardsTable.position,
+      title: cardsTable.title,
+    })
+    .from(cardsTable)
+    .innerJoin(decksTable, eq(cardsTable.deckId, decksTable.id))
+    .where(and(
+      eq(cardsTable.deckId, deckId),
+      eq(decksTable.userId, userId)
+    ));
+}
 
 function isCardsPrimaryKeyConflict(error: unknown): boolean {
   const candidates = [error];
@@ -114,25 +156,6 @@ export async function getUserCardById(cardId: string, userId: string) {
   return result || null;
 }
 
-/**
- * Get all cards (no user filter) - for system operations only
- */
-export async function getAllCards() {
-  return await db.select()
-    .from(cardsTable)
-    .orderBy(cardsTable.deckId, cardsTable.position);
-}
-
-/**
- * Get cards for a deck (no user filter) - for system operations only
- */
-export async function getCardsByDeckId(deckId: number) {
-  return await db.select()
-    .from(cardsTable)
-    .where(eq(cardsTable.deckId, deckId))
-    .orderBy(cardsTable.position);
-}
-
 // CREATE OPERATIONS
 
 /**
@@ -142,24 +165,13 @@ export async function createCardForDeck(deckId: string, userId: string, data: Cr
   try {
     const parsedDeckId = parseInt(deckId);
 
-    // First verify the user owns the deck
-    const [deckOwnership] = await db.select({ id: decksTable.id })
-      .from(decksTable)
-      .where(and(
-        eq(decksTable.id, parsedDeckId),
-        eq(decksTable.userId, userId)
-      ));
-
-    if (!deckOwnership) {
-      throw new Error('Deck not found or access denied');
+    const ownedDeckId = await getOwnedDeckId(parsedDeckId, userId);
+    if (!ownedDeckId) {
+      logOwnershipDenial('createCardForDeck', { deckId, userId });
+      throw new Error(RESOURCE_NOT_FOUND);
     }
 
-    const existingCards = await db.select({
-      position: cardsTable.position,
-      title: cardsTable.title,
-    })
-      .from(cardsTable)
-      .where(eq(cardsTable.deckId, parsedDeckId));
+    const existingCards = await getOwnedDeckCardMeta(parsedDeckId, userId);
 
     // Get the next position if not provided
     let position = data.position;
@@ -200,7 +212,7 @@ export async function createCardForDeck(deckId: string, userId: string, data: Cr
       return await insertCard();
     }
   } catch (error) {
-    if (error instanceof Error && error.message === 'Deck not found or access denied') {
+    if (error instanceof Error && error.message === RESOURCE_NOT_FOUND) {
       throw error;
     }
     console.error('Database error creating card:', error);
@@ -219,23 +231,13 @@ export async function createCardsForUserDeck(
   try {
     const parsedDeckId = parseInt(deckId);
 
-    const [deckOwnership] = await db.select({ id: decksTable.id })
-      .from(decksTable)
-      .where(and(
-        eq(decksTable.id, parsedDeckId),
-        eq(decksTable.userId, userId)
-      ));
-
-    if (!deckOwnership) {
-      throw new Error('Deck not found or access denied');
+    const ownedDeckId = await getOwnedDeckId(parsedDeckId, userId);
+    if (!ownedDeckId) {
+      logOwnershipDenial('createCardsForUserDeck', { deckId, userId });
+      throw new Error(RESOURCE_NOT_FOUND);
     }
 
-    const existingCards = await db.select({
-      position: cardsTable.position,
-      title: cardsTable.title,
-    })
-      .from(cardsTable)
-      .where(eq(cardsTable.deckId, parsedDeckId));
+    const existingCards = await getOwnedDeckCardMeta(parsedDeckId, userId);
 
     let lastPosition = existingCards.reduce(
       (max, card) => (card.position > max ? card.position : max),
@@ -274,36 +276,12 @@ export async function createCardsForUserDeck(
       return await insertCards();
     }
   } catch (error) {
-    if (error instanceof Error && error.message === 'Deck not found or access denied') {
+    if (error instanceof Error && error.message === RESOURCE_NOT_FOUND) {
       throw error;
     }
     console.error('Database error creating cards:', error);
     throw new Error('Failed to create cards');
   }
-}
-
-/**
- * Create a card with specific data (for seeding/testing)
- */
-export async function createCard(cardData: typeof cardsTable.$inferInsert) {
-  const [newCard] = await db.insert(cardsTable)
-    .values(cardData)
-    .returning();
-  
-  return newCard;
-}
-
-/**
- * Create multiple cards for a deck (for seeding/testing)
- */
-export async function createCardsForDeck(deckId: number, cardsData: Array<Omit<typeof cardsTable.$inferInsert, 'deckId'>>) {
-  const cardsWithDeckId = cardsData.map(card => ({
-    ...card,
-    deckId
-  }));
-  
-  await db.insert(cardsTable)
-    .values(cardsWithDeckId);
 }
 
 // UPDATE OPERATIONS
@@ -312,21 +290,21 @@ export async function createCardsForDeck(deckId: number, cardsData: Array<Omit<t
  * Update a user's card
  */
 export async function updateUserCard(cardId: string, userId: string, data: UpdateCardInput) {
-  // First verify the user owns the card through deck ownership
-  const ownership = await getUserCardById(cardId, userId);
-  if (!ownership) {
-    throw new Error('Card not found or access denied');
-  }
-  
+  const parsedCardId = parseInt(cardId);
   const [updatedCard] = await db.update(cardsTable)
     .set({
       ...data,
       updatedAt: new Date()
     })
-    .where(eq(cardsTable.id, parseInt(cardId)))
+    .where(inArray(cardsTable.id, ownedCardIdsForUser(parsedCardId, userId)))
     .returning();
-  
-  return updatedCard || null;
+
+  if (!updatedCard) {
+    logOwnershipDenial('updateUserCard', { cardId, userId });
+    throw new Error(RESOURCE_NOT_FOUND);
+  }
+
+  return updatedCard;
 }
 
 // DELETE OPERATIONS
@@ -335,58 +313,43 @@ export async function updateUserCard(cardId: string, userId: string, data: Updat
  * Delete a user's card
  */
 export async function deleteUserCard(cardId: string, userId: string) {
-  // First verify the user owns the card through deck ownership
-  const ownership = await getUserCardById(cardId, userId);
-  if (!ownership) {
-    throw new Error('Card not found or access denied');
+  const parsedCardId = parseInt(cardId);
+  const [deletedCard] = await db.delete(cardsTable)
+    .where(inArray(cardsTable.id, ownedCardIdsForUser(parsedCardId, userId)))
+    .returning({ id: cardsTable.id });
+
+  if (!deletedCard) {
+    logOwnershipDenial('deleteUserCard', { cardId, userId });
+    throw new Error(RESOURCE_NOT_FOUND);
   }
-  
-  await db.delete(cardsTable)
-    .where(eq(cardsTable.id, parseInt(cardId)));
 }
 
 /**
  * Delete selected cards that belong to a user's deck
  */
 export async function deleteUserCards(cardIds: string[], deckId: string, userId: string) {
-  const deck = await getUserDeckById(deckId, userId);
-  if (!deck) {
-    throw new Error('Resource not found');
-  }
-
   const uniqueIds = [...new Set(cardIds.map((id) => parseInt(id, 10)))];
-  const ownedCards = await db.select({ id: cardsTable.id })
+  const parsedDeckId = parseInt(deckId);
+
+  const ownedCardIds = db
+    .select({ id: cardsTable.id })
     .from(cardsTable)
+    .innerJoin(decksTable, eq(cardsTable.deckId, decksTable.id))
     .where(and(
-      eq(cardsTable.deckId, deck.id),
+      eq(cardsTable.deckId, parsedDeckId),
+      eq(decksTable.userId, userId),
       inArray(cardsTable.id, uniqueIds)
     ));
+
+  const ownedCards = await ownedCardIds;
 
   if (ownedCards.length !== uniqueIds.length) {
-    throw new Error('Resource not found');
+    logOwnershipDenial('deleteUserCards', { deckId, userId });
+    throw new Error(RESOURCE_NOT_FOUND);
   }
 
   await db.delete(cardsTable)
-    .where(and(
-      eq(cardsTable.deckId, deck.id),
-      inArray(cardsTable.id, uniqueIds)
-    ));
+    .where(inArray(cardsTable.id, ownedCardIds));
 
   return ownedCards.length;
-}
-
-/**
- * Delete all cards for a specific deck (no user filter) - for system operations only
- */
-export async function deleteCardsByDeckId(deckId: number) {
-  await db.delete(cardsTable)
-    .where(eq(cardsTable.deckId, deckId));
-}
-
-/**
- * Delete card by ID (no user filter) - for system operations only
- */
-export async function deleteCardById(cardId: number) {
-  await db.delete(cardsTable)
-    .where(eq(cardsTable.id, cardId));
 }

@@ -18,6 +18,7 @@ export async function createDeck(data: CreateDeckInput) {
   try {
     const { userId, has } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
@@ -56,6 +57,7 @@ export async function updateDeck(deckId: string, data: UpdateDeckInput) {
   try {
     const { userId } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
@@ -88,6 +90,7 @@ export async function deleteDeck(data: DeleteDeckInput) {
   try {
     const { userId } = await auth();
     if (!userId) {
+      console.error('Security: unauthenticated mutation attempt');
       throw new Error('Unauthorized');
     }
 
@@ -106,7 +109,7 @@ export async function deleteDeck(data: DeleteDeckInput) {
       };
     }
     if (error instanceof Error) {
-      if (error.message === 'Deck not found or access denied') {
+      if (error.message === 'Deck not found or access denied' || error.message === 'Resource not found') {
         return { success: false, error: 'Resource not found' };
       }
       return { success: false, error: error.message };
