@@ -35,6 +35,15 @@ export const deleteCardSchema = z.object({
   deckId: z.string().regex(/^\d+$/, 'Invalid deck'),
 });
 
+export const deleteCardsSchema = z.object({
+  deckId: z.string().regex(/^\d+$/, 'Invalid deck'),
+  cardIds: z.array(z.string().regex(/^\d+$/, 'Invalid card')).min(1, 'Select at least one card'),
+});
+
+export const generateCardsWithAISchema = z.object({
+  deckId: z.string().regex(/^\d+$/, 'Invalid deck'),
+});
+
 // TypeScript types from Zod schemas
 export type CreateDeckInput = z.infer<typeof createDeckSchema>;
 export type UpdateDeckInput = z.infer<typeof updateDeckSchema>;
@@ -42,3 +51,5 @@ export type DeleteDeckInput = z.infer<typeof deleteDeckSchema>;
 export type CreateCardInput = z.infer<typeof createCardSchema>;
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 export type DeleteCardInput = z.infer<typeof deleteCardSchema>;
+export type DeleteCardsInput = z.infer<typeof deleteCardsSchema>;
+export type GenerateCardsWithAIInput = z.infer<typeof generateCardsWithAISchema>;
