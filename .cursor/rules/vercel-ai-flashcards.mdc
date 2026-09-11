@@ -1,0 +1,42 @@
+---
+description: Use the Vercel AI SDK to generate structured flashcards via OpenAI
+globs: src/actions/**/*.ts,src/db/queries/cards.ts,src/components/**/*Card*.tsx,src/lib/**/*.ts
+alwaysApply: false
+---
+
+# Vercel AI Flashcard Generation
+
+Use the **Vercel AI SDK** (`ai` + `@ai-sdk/openai`) for all AI flashcard generation. Do not call the OpenAI HTTP API or `openai` SDK directly.
+
+- Run generation only in a **Server Action**. Gate with `has({ feature: 'ai_flashcard_generation' })` after `auth()`.
+- Validate inputs and model output with **Zod**. Persist cards via `db/queries` helpers (`createCardForDeck` / batch insert), never raw Drizzle in the action.
+- Cards must match app fields: `front` and `back` strings. Ask the model for **exactly `x` cards**.
+
+```ts
+import { generateText, Output } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+
+const cardCount = x; // number of cards requested by the user
+
+const { output } = await generateText({
+  model: openai("gpt-5-nano"),
+  output: Output.object({
+    schema: z.object({
+      cards: z
+        .array(
+          z.object({
+            front: z.string().min(1),
+            back: z.string().min(1),
+          }),
+        )
+        .length(cardCount),
+    }),
+  }),
+  prompt: `Generate exactly ${cardCount} flashcards for this deck. Infer subject and front/back format only from the deck title and description. Do not assume a topic or card style the context does not support.`,
+});
+
+// output.cards is { front: string; back: string }[]
+```
+
+Do not use `Output.object` with a recipe (or other unrelated) schema. Always return `{ cards: [...] }` with `front` / `back`.

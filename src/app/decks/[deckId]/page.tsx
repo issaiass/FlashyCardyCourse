@@ -10,6 +10,8 @@ import DeckCards from './components/DeckCards';
 import { CreateCardDialog } from '@/components/CreateCardDialog';
 import { EditDeckDialog } from '@/components/EditDeckDialog';
 import { DeleteDeckDialog } from '@/components/DeleteDeckDialog';
+import { GenerateCardsWithAIButton } from '@/components/GenerateCardsWithAIButton';
+import { DeleteCardsDialog } from '@/components/DeleteCardsDialog';
 import { FREE_CARD_LIMIT } from '@/lib/billing';
 
 export default async function DeckPage({
@@ -107,6 +109,11 @@ export default async function DeckPage({
                   Delete Deck
                 </Button>
               </DeleteDeckDialog>
+              <GenerateCardsWithAIButton
+                deckId={deck.id}
+                title={deck.title}
+                description={deck.description}
+              />
               {addCardControl}
             </div>
           </div>
@@ -154,11 +161,26 @@ export default async function DeckPage({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold">Cards</h2>
             {cardCount > 0 && (
-              <Button variant="outline" asChild>
-                <Link href={`/decks/${deck.id}/study`}>
-                  Start Studying
-                </Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <DeleteCardsDialog
+                  deckId={deck.id}
+                  cards={cards.map((card) => ({
+                    id: card.id,
+                    title: card.title,
+                    front: card.front,
+                  }))}
+                >
+                  <Button variant="outline">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Cards
+                  </Button>
+                </DeleteCardsDialog>
+                <Button variant="outline" asChild>
+                  <Link href={`/decks/${deck.id}/study`}>
+                    Start Studying
+                  </Link>
+                </Button>
+              </div>
             )}
           </div>
 
@@ -170,18 +192,26 @@ export default async function DeckPage({
                   <p className="text-sm text-muted-foreground max-w-md">
                     Get started by adding your first flashcard to this deck.
                   </p>
-                  {atCardLimit ? (
-                    <Button asChild>
-                      <Link href="/pricing">Upgrade to add more cards</Link>
-                    </Button>
-                  ) : (
-                    <CreateCardDialog deckId={deck.id}>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Your First Card
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <GenerateCardsWithAIButton
+                      deckId={deck.id}
+                      title={deck.title}
+                      description={deck.description}
+                      size="default"
+                    />
+                    {atCardLimit ? (
+                      <Button asChild>
+                        <Link href="/pricing">Upgrade to add more cards</Link>
                       </Button>
-                    </CreateCardDialog>
-                  )}
+                    ) : (
+                      <CreateCardDialog deckId={deck.id}>
+                        <Button>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Your First Card
+                        </Button>
+                      </CreateCardDialog>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>

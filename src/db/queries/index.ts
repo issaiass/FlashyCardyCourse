@@ -25,6 +25,7 @@ export {
   createCardsForDeck,
   updateUserCard,
   deleteUserCard,
+  deleteUserCards,
   deleteCardsByDeckId,
   deleteCardById
 } from './cards';

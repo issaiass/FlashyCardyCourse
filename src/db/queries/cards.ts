@@ -1,7 +1,8 @@
 import { db } from '@/db';
 import { cardsTable, decksTable } from '@/db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, inArray, sql } from 'drizzle-orm';
 import type { CreateCardInput, UpdateCardInput } from '@/lib/validations';
+import { getUserDeckById } from '@/db/queries/decks';
 
 function isCardsPrimaryKeyConflict(error: unknown): boolean {
   const candidates = [error];
@@ -208,6 +209,80 @@ export async function createCardForDeck(deckId: string, userId: string, data: Cr
 }
 
 /**
+ * Create multiple cards for a user-owned deck
+ */
+export async function createCardsForUserDeck(
+  deckId: string,
+  userId: string,
+  cards: Array<{ front: string; back: string }>
+) {
+  try {
+    const parsedDeckId = parseInt(deckId);
+
+    const [deckOwnership] = await db.select({ id: decksTable.id })
+      .from(decksTable)
+      .where(and(
+        eq(decksTable.id, parsedDeckId),
+        eq(decksTable.userId, userId)
+      ));
+
+    if (!deckOwnership) {
+      throw new Error('Deck not found or access denied');
+    }
+
+    const existingCards = await db.select({
+      position: cardsTable.position,
+      title: cardsTable.title,
+    })
+      .from(cardsTable)
+      .where(eq(cardsTable.deckId, parsedDeckId));
+
+    let lastPosition = existingCards.reduce(
+      (max, card) => (card.position > max ? card.position : max),
+      0
+    );
+    const titles = existingCards.map((card) => card.title);
+
+    const values = cards.map((card) => {
+      const title = getNextDefaultCardTitle(titles);
+      titles.push(title);
+      lastPosition += 1;
+
+      return {
+        title,
+        front: card.front,
+        back: card.back,
+        deckId: parsedDeckId,
+        position: lastPosition,
+      };
+    });
+
+    const insertCards = async () => {
+      return await db.insert(cardsTable)
+        .values(values)
+        .returning();
+    };
+
+    try {
+      return await insertCards();
+    } catch (insertError) {
+      if (!isCardsPrimaryKeyConflict(insertError)) {
+        throw insertError;
+      }
+
+      await syncCardsIdSequence();
+      return await insertCards();
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === 'Deck not found or access denied') {
+      throw error;
+    }
+    console.error('Database error creating cards:', error);
+    throw new Error('Failed to create cards');
+  }
+}
+
+/**
  * Create a card with specific data (for seeding/testing)
  */
 export async function createCard(cardData: typeof cardsTable.$inferInsert) {
@@ -268,6 +343,36 @@ export async function deleteUserCard(cardId: string, userId: string) {
   
   await db.delete(cardsTable)
     .where(eq(cardsTable.id, parseInt(cardId)));
+}
+
+/**
+ * Delete selected cards that belong to a user's deck
+ */
+export async function deleteUserCards(cardIds: string[], deckId: string, userId: string) {
+  const deck = await getUserDeckById(deckId, userId);
+  if (!deck) {
+    throw new Error('Resource not found');
+  }
+
+  const uniqueIds = [...new Set(cardIds.map((id) => parseInt(id, 10)))];
+  const ownedCards = await db.select({ id: cardsTable.id })
+    .from(cardsTable)
+    .where(and(
+      eq(cardsTable.deckId, deck.id),
+      inArray(cardsTable.id, uniqueIds)
+    ));
+
+  if (ownedCards.length !== uniqueIds.length) {
+    throw new Error('Resource not found');
+  }
+
+  await db.delete(cardsTable)
+    .where(and(
+      eq(cardsTable.deckId, deck.id),
+      inArray(cardsTable.id, uniqueIds)
+    ));
+
+  return ownedCards.length;
 }
 
 /**

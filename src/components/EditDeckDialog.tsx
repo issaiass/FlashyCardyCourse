@@ -19,6 +19,7 @@ interface EditDeckDialogProps {
   deckId: number;
   title: string;
   description: string | null;
+  requireDescription?: boolean;
   children: React.ReactNode;
 }
 
@@ -26,6 +27,7 @@ export function EditDeckDialog({
   deckId,
   title,
   description,
+  requireDescription = false,
   children,
 }: EditDeckDialogProps) {
   const router = useRouter();
@@ -50,6 +52,11 @@ export function EditDeckDialog({
 
     if (!formData.title.trim()) {
       setMessage({ type: 'error', text: 'Title is required' });
+      return;
+    }
+
+    if (requireDescription && !formData.description.trim()) {
+      setMessage({ type: 'error', text: 'Add a description before generating cards with AI.' });
       return;
     }
 
@@ -107,7 +114,9 @@ export function EditDeckDialog({
         <DialogHeader>
           <DialogTitle>Edit Deck</DialogTitle>
           <DialogDescription>
-            Update this deck&apos;s title and description.
+            {requireDescription
+              ? 'Add a description first so AI can generate flashcards for this deck.'
+              : "Update this deck's title and description."}
           </DialogDescription>
         </DialogHeader>
 
@@ -137,7 +146,7 @@ export function EditDeckDialog({
 
           <div className="space-y-2">
             <label htmlFor="edit-deck-description" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-              Description (Optional)
+              {requireDescription ? 'Description' : 'Description (Optional)'}
             </label>
             <Textarea
               id="edit-deck-description"
@@ -145,6 +154,7 @@ export function EditDeckDialog({
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+              required={requireDescription}
             />
           </div>
 
