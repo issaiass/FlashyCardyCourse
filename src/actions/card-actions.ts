@@ -3,7 +3,8 @@
 import { auth } from '@clerk/nextjs/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createCardForDeck, deleteUserCard, updateUserCard } from '@/db/queries/cards';
+import { countCardsForUserDeck, createCardForDeck, deleteUserCard, updateUserCard } from '@/db/queries/cards';
+import { FREE_CARD_LIMIT } from '@/lib/billing';
 import {
   createCardSchema,
   deleteCardSchema,
@@ -15,9 +16,20 @@ import {
 
 export async function createCard(deckId: string, data: CreateCardInput) {
   try {
-    const { userId } = await auth();
+    const { userId, has } = await auth();
     if (!userId) {
       throw new Error('Unauthorized');
+    }
+
+    const isPaid = has({ plan: 'paid_user' });
+    if (!isPaid) {
+      const cardCount = await countCardsForUserDeck(deckId, userId);
+      if (cardCount >= FREE_CARD_LIMIT) {
+        return {
+          success: false,
+          error: `Free plan is limited to ${FREE_CARD_LIMIT} cards per deck. Upgrade to add more.`,
+        };
+      }
     }
 
     const validatedData = createCardSchema.parse(data);

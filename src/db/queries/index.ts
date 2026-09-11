@@ -1,6 +1,8 @@
 // Export all deck query functions
 export {
   getUserDecks,
+  getUserDecksWithCardCounts,
+  countUserDecks,
   getUserDeckById,
   getDeckWithCards,
   getAllDecks,
@@ -14,6 +16,7 @@ export {
 // Export all card query functions
 export {
   getCardsByDeck,
+  countCardsForUserDeck,
   getUserCardById,
   getAllCards,
   getCardsByDeckId,

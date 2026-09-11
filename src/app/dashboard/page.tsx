@@ -1,5 +1,7 @@
+import { Show } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,9 +10,10 @@ import { CreateDeckDialog } from "@/components/CreateDeckDialog";
 import { DeckListCard } from "@/components/DeckListCard";
 import { StartStudyDialog } from "@/components/StartStudyDialog";
 import { getUserDecksWithCardCounts } from "@/db/queries/decks";
+import { FREE_DECK_LIMIT } from "@/lib/billing";
 
 export default async function Dashboard() {
-  const { userId } = await auth();
+  const { userId, has } = await auth();
   
   if (!userId) {
     redirect('/');
@@ -18,6 +21,8 @@ export default async function Dashboard() {
 
   // Fetch user's decks with card counts
   const userDecks = await getUserDecksWithCardCounts(userId);
+  const hasUnlimitedDecks = has({ feature: "unlimited_decks" });
+  const atDeckLimit = !hasUnlimitedDecks && userDecks.length >= FREE_DECK_LIMIT;
   const studyDecks = userDecks.map((deck) => ({
     id: deck.id,
     title: deck.title,
@@ -38,9 +43,18 @@ export default async function Dashboard() {
                 Welcome to your FlashyCardy dashboard
               </p>
             </div>
-            <Badge variant="secondary" className="text-sm">
-              Free Plan
-            </Badge>
+            <Show
+              when={{ plan: "paid_user" }}
+              fallback={
+                <Badge variant="secondary" className="text-sm">
+                  Free Plan
+                </Badge>
+              }
+            >
+              <Badge variant="secondary" className="text-sm">
+                Paid Plan
+              </Badge>
+            </Show>
           </div>
         </header>
         
@@ -62,14 +76,27 @@ export default async function Dashboard() {
                     <div>
                       <div className="text-2xl font-bold mb-1">{userDecks.length}</div>
                       <p className="text-sm text-muted-foreground">
-                        Total decks created
+                        {hasUnlimitedDecks
+                          ? "Total decks created"
+                          : `${userDecks.length} of ${FREE_DECK_LIMIT} decks on the Free plan`}
                       </p>
                     </div>
-                    <CreateDeckDialog>
-                      <Button className="w-full">
-                        Create New Deck
-                      </Button>
-                    </CreateDeckDialog>
+                    {atDeckLimit ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Free plan is limited to {FREE_DECK_LIMIT} decks.
+                        </p>
+                        <Button asChild className="w-full">
+                          <Link href="/pricing">Upgrade to create more</Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <CreateDeckDialog>
+                        <Button className="w-full">
+                          Create New Deck
+                        </Button>
+                      </CreateDeckDialog>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -156,9 +183,15 @@ export default async function Dashboard() {
                     <p className="text-muted-foreground mb-6 max-w-sm">
                       Create your first flashcard deck to start learning and studying effectively.
                     </p>
-                    <CreateDeckDialog>
-                      <Button>Create Your First Deck</Button>
-                    </CreateDeckDialog>
+                    {atDeckLimit ? (
+                      <Button asChild>
+                        <Link href="/pricing">Upgrade to create more</Link>
+                      </Button>
+                    ) : (
+                      <CreateDeckDialog>
+                        <Button>Create Your First Deck</Button>
+                      </CreateDeckDialog>
+                    )}
                   </div>
                 </CardContent>
               </Card>

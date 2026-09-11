@@ -53,6 +53,19 @@ export async function getUserDecksWithCardCounts(userId: string): Promise<DeckWi
 }
 
 /**
+ * Count decks owned by a user
+ */
+export async function countUserDecks(userId: string): Promise<number> {
+  const [result] = await db.select({
+    count: sql<number>`count(${decksTable.id})`.as('count'),
+  })
+    .from(decksTable)
+    .where(eq(decksTable.userId, userId));
+
+  return Number(result?.count ?? 0);
+}
+
+/**
  * Get a single deck by ID for a specific user
  */
 export async function getUserDeckById(deckId: string, userId: string) {

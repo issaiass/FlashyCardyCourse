@@ -1,7 +1,9 @@
+import { Button } from "@/components/ui/button";
 import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
 
 const poppins = Poppins({
@@ -25,13 +27,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ClerkProvider appearance={{ theme: dark }}>
           <header className="bg-slate-1200 border-b border-slate-800 text-white px-6 py-4 flex items-center justify-between">
             <h1 className="text-xl font-semibold">FlashyCardy</h1>
-            <UserButton 
-              appearance={{
-                elements: {
-                  avatarBox: "w-8 h-8"
-                }
-              }}
-            />
+            <nav className="flex items-center gap-3">
+              <Button variant="ghost" asChild>
+                <Link href="/pricing">Pricing</Link>
+              </Button>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8",
+                  },
+                }}
+              />
+            </nav>
           </header>
           <main className="flex-1">
             {children}

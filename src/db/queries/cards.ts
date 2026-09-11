@@ -75,6 +75,23 @@ export async function getCardsByDeck(deckId: string, userId: string) {
 }
 
 /**
+ * Count cards in a deck owned by a user
+ */
+export async function countCardsForUserDeck(deckId: string, userId: string): Promise<number> {
+  const [result] = await db.select({
+    count: sql<number>`count(${cardsTable.id})`.as('count'),
+  })
+    .from(cardsTable)
+    .innerJoin(decksTable, eq(cardsTable.deckId, decksTable.id))
+    .where(and(
+      eq(cardsTable.deckId, parseInt(deckId)),
+      eq(decksTable.userId, userId)
+    ));
+
+  return Number(result?.count ?? 0);
+}
+
+/**
  * Get a single card by ID (with user ownership verification)
  */
 export async function getUserCardById(cardId: string, userId: string) {

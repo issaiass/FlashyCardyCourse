@@ -1,0 +1,69 @@
+---
+alwaysApply: true
+---
+# Clerk Billing (B2C)
+
+Use **Clerk Billing** for all subscriptions and payments. Do not implement custom Stripe Billing, checkout, webhooks, or a local `subscriptions` table. Plans and Features live in the Clerk Dashboard.
+
+## Plans and Features
+
+| Kind | Slug |
+| --- | --- |
+| Plan | `free_user` |
+| Plan | `paid_user` |
+| Feature | `3_deck_limit` |
+| Feature | `unlimited_decks` |
+| Feature | `ai_flashcard_generation` |
+
+Gate by **Feature** when the entitlement is a capability (deck limits, AI). Gate by **Plan** only when the whole plan must match.
+
+## Pricing page
+
+Dedicated route with `<PricingTable />`. Layout with Tailwind (no inline styles):
+
+```tsx
+import { PricingTable } from '@clerk/nextjs'
+
+export default function PricingPage() {
+  return (
+    <div className="mx-auto max-w-3xl px-4">
+      <PricingTable />
+    </div>
+  )
+}
+```
+
+## Server: `has()` (required for mutations)
+
+UI hiding is not security. Server Components and Server Actions must call `has()` after `auth()`.
+
+```tsx
+import { auth } from '@clerk/nextjs/server'
+
+const { userId, has } = await auth()
+if (!userId) redirect('/')
+
+const canUseAi = has({ feature: 'ai_flashcard_generation' })
+const isPaid = has({ plan: 'paid_user' })
+
+if (!canUseAi) throw new Error('Feature not available')
+```
+
+- Creating decks: enforce `3_deck_limit` vs `unlimited_decks` in the create-deck Server Action (count existing decks, then allow or reject).
+- AI flashcard generation: require `ai_flashcard_generation` in the Server Action before any generation work.
+
+## Client UI: `<Show>`
+
+```tsx
+import { Show } from '@clerk/nextjs'
+
+<Show when={{ feature: 'ai_flashcard_generation' }} fallback={<p>Upgrade to generate cards with AI.</p>}>
+  {/* AI controls */}
+</Show>
+
+<Show when={{ plan: 'paid_user' }} fallback={null}>
+  {/* Paid-only chrome */}
+</Show>
+```
+
+Do not roll custom plan checks from Clerk user metadata. Use `has()` / `<Show>` with the slugs above.

@@ -10,11 +10,12 @@ import DeckCards from './components/DeckCards';
 import { CreateCardDialog } from '@/components/CreateCardDialog';
 import { EditDeckDialog } from '@/components/EditDeckDialog';
 import { DeleteDeckDialog } from '@/components/DeleteDeckDialog';
+import { FREE_CARD_LIMIT } from '@/lib/billing';
 
 export default async function DeckPage({
   params,
 }: PageProps<'/decks/[deckId]'>) {
-  const { userId } = await auth();
+  const { userId, has } = await auth();
   const { deckId } = await params;
   
   // Redirect unauthenticated users to homepage
@@ -42,6 +43,21 @@ export default async function DeckPage({
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
   const cardCount = cards.length;
+  const isPaid = has({ plan: 'paid_user' });
+  const atCardLimit = !isPaid && cardCount >= FREE_CARD_LIMIT;
+
+  const addCardControl = atCardLimit ? (
+    <Button size="sm" asChild>
+      <Link href="/pricing">Upgrade to add more cards</Link>
+    </Button>
+  ) : (
+    <CreateCardDialog deckId={deck.id}>
+      <Button size="sm">
+        <Plus className="h-4 w-4 mr-2" />
+        Add Card
+      </Button>
+    </CreateCardDialog>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -91,12 +107,7 @@ export default async function DeckPage({
                   Delete Deck
                 </Button>
               </DeleteDeckDialog>
-              <CreateCardDialog deckId={deck.id}>
-                <Button size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Card
-                </Button>
-              </CreateCardDialog>
+              {addCardControl}
             </div>
           </div>
         </div>
@@ -115,6 +126,11 @@ export default async function DeckPage({
                 <div>
                   <div className="font-medium text-muted-foreground">Total Cards</div>
                   <div className="text-2xl font-bold">{cardCount}</div>
+                  {!isPaid && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {cardCount} of {FREE_CARD_LIMIT} cards on the Free plan
+                    </p>
+                  )}
                 </div>
                 <div>
                   <div className="font-medium text-muted-foreground">Created</div>
@@ -154,12 +170,18 @@ export default async function DeckPage({
                   <p className="text-sm text-muted-foreground max-w-md">
                     Get started by adding your first flashcard to this deck.
                   </p>
-                  <CreateCardDialog deckId={deck.id}>
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Your First Card
+                  {atCardLimit ? (
+                    <Button asChild>
+                      <Link href="/pricing">Upgrade to add more cards</Link>
                     </Button>
-                  </CreateCardDialog>
+                  ) : (
+                    <CreateCardDialog deckId={deck.id}>
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Card
+                      </Button>
+                    </CreateCardDialog>
+                  )}
                 </div>
               </CardContent>
             </Card>
